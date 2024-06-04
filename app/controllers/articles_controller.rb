@@ -1,10 +1,11 @@
 class ArticlesController < ApplicationController
   before_action :authenticate_user!, except: [:index, :show]
   before_action :set_article, only: %i[ show update destroy ]
+  before_action :authorize_article, only: %i[ show update destroy ]
 
   # GET /articles
   def index
-    @articles = Article.all
+    @articles = Article.where(private: false).or(Article.where(user: current_user))
 
     render json: @articles
   end
@@ -17,6 +18,7 @@ class ArticlesController < ApplicationController
   # POST /articles
   def create
     @article = Article.new(article_params)
+    @article.user = current_user
 
     if @article.save
       render json: @article, status: :created, location: @article
@@ -40,13 +42,18 @@ class ArticlesController < ApplicationController
   end
 
   private
-    # Use callbacks to share common setup or constraints between actions.
+
     def set_article
       @article = Article.find(params[:id])
     end
 
-    # Only allow a list of trusted parameters through.
+    def authorize_article
+      if @article.private && @article.user != current_user
+        render json: { error: "Not authorized" }, status: :forbidden
+      end
+    end
+
     def article_params
-      params.require(:article).permit(:title, :content, :user_id)
+      params.require(:article).permit(:title, :content, :private)
     end
 end
